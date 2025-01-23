@@ -19,6 +19,22 @@ from albumy.models import User, Photo, Tag, Follow, Collect, Comment, Notificati
 from albumy.notifications import push_comment_notification, push_collect_notification
 from albumy.utils import rename_image, resize_image, redirect_back, flash_errors
 
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+from msrest.authentication import CognitiveServicesCredentials
+from dotenv import load_dotenv
+import os
+# Ensure credentials and endpoint are loaded
+load_dotenv('.env')
+alt_url = os.getenv('ENDPOINT')
+alt_key = os.getenv('KEY')
+
+# Initialize ComputerVisionClient
+credentials = CognitiveServicesCredentials(alt_key)
+cv_client = ComputerVisionClient(endpoint=alt_url, credentials=credentials)
+
+
+
+
 main_bp = Blueprint('main', __name__)
 
 
@@ -114,10 +130,15 @@ def get_avatar(filename):
     return send_from_directory(current_app.config['AVATARS_SAVE_PATH'], filename)
 
 
+
+
 @main_bp.route('/upload', methods=['GET', 'POST'])
 @login_required
 @confirm_required
 @permission_required('UPLOAD')
+
+
+
 def upload():
     if request.method == 'POST' and 'file' in request.files:
         f = request.files.get('file')
@@ -125,10 +146,25 @@ def upload():
         f.save(os.path.join(current_app.config['ALBUMY_UPLOAD_PATH'], filename))
         filename_s = resize_image(f, filename, current_app.config['ALBUMY_PHOTO_SIZE']['small'])
         filename_m = resize_image(f, filename, current_app.config['ALBUMY_PHOTO_SIZE']['medium'])
+        # Calling CV API
+        alt_text = None
+        # Calling CV API
+        alt_text = "No description available."
+        try:
+            file_path = os.path.join(current_app.config['ALBUMY_UPLOAD_PATH'], filename)
+            with open(file_path, 'rb') as image_file:
+                # Use Azure SDK to describe the image
+                analysis = cv_client.describe_image_in_stream(image_file)
+                if analysis.captions:
+                    alt_text = analysis.captions[0].text  # Get the first caption text
+        except Exception as e:
+            current_app.logger.error(f"Alt text generation failed for {filename}: {e}")
+
         photo = Photo(
             filename=filename,
             filename_s=filename_s,
             filename_m=filename_m,
+            description=alt_text,
             author=current_user._get_current_object()
         )
         db.session.add(photo)
