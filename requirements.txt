@@ -29,5 +29,5 @@ watchdog==0.10.2
 # New packages
 load_dotenv
 azure-cognitiveservices-vision-computervision
-flask_wtf
+
 
