@@ -23,6 +23,9 @@ from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from msrest.authentication import CognitiveServicesCredentials
 from dotenv import load_dotenv
 import os
+
+# New packages
+from flask import jsonify
 # Ensure credentials and endpoint are loaded
 load_dotenv('.env')
 alt_url = os.getenv('ENDPOINT')
@@ -31,6 +34,7 @@ alt_key = os.getenv('KEY')
 # Initialize ComputerVisionClient
 credentials = CognitiveServicesCredentials(alt_key)
 cv_client = ComputerVisionClient(endpoint=alt_url, credentials=credentials)
+
 
 
 
@@ -133,6 +137,7 @@ def get_avatar(filename):
 
 
 @main_bp.route('/upload', methods=['GET', 'POST'])
+
 @login_required
 @confirm_required
 @permission_required('UPLOAD')
@@ -142,18 +147,18 @@ def get_avatar(filename):
 def upload():
     if request.method == 'POST' and 'file' in request.files:
         f = request.files.get('file')
+        # Adding the get description from the form
+        description = request.form.get('description', '')
         filename = rename_image(f.filename)
         f.save(os.path.join(current_app.config['ALBUMY_UPLOAD_PATH'], filename))
         filename_s = resize_image(f, filename, current_app.config['ALBUMY_PHOTO_SIZE']['small'])
         filename_m = resize_image(f, filename, current_app.config['ALBUMY_PHOTO_SIZE']['medium'])
         # Calling CV API
-        alt_text = None
-        # Calling CV API
         alt_text = "No description available."
         try:
             file_path = os.path.join(current_app.config['ALBUMY_UPLOAD_PATH'], filename)
             with open(file_path, 'rb') as image_file:
-                # Use Azure SDK to describe the image
+                # Using Azure SDK to describe the image
                 analysis = cv_client.describe_image_in_stream(image_file)
                 if analysis.captions:
                     alt_text = analysis.captions[0].text  # Get the first caption text
@@ -164,7 +169,7 @@ def upload():
             filename=filename,
             filename_s=filename_s,
             filename_m=filename_m,
-            description=alt_text,
+            description=description or alt_text, # Using provided description if available
             author=current_user._get_current_object()
         )
         db.session.add(photo)

@@ -14,7 +14,14 @@
     </div>
     <div class="row">
         <div class="col-md-12">
-            {{ dropzone.create(action='main.upload') }}
+            <form id="myDropzone" class="dropzone" action="{{ url_for('main.upload') }}" method="post" enctype="multipart/form-data">
+                <div class="form-group mt-3">
+                    <label for="description">Description</label>
+                    <textarea class="form-control" name="description" id="description" rows="3" placeholder="Enter a description for the photo"></textarea>
+                </div>
+                <div class="dropzone-previews"></div>
+                <button type="button" id="uploadButton" class="btn btn-primary mt-2">Upload</button>
+            </form>
             <a class="btn btn-light float-right" href="{{ url_for('user.index', username=current_user.username) }}">
                 Done
             </a>
@@ -25,5 +32,44 @@
 {% block scripts %}
     {{ super() }}
     <script src="{{ url_for('static', filename='js/dropzone.min.js') }}"></script>
-    {{ dropzone.config() }}
+    <script>
+            Dropzone.options.myDropzone = {
+                url: "{{ url_for('main.upload') }}",
+                autoProcessQueue: false,
+                uploadMultiple: false,
+                maxFiles: 1,
+                addRemoveLinks: true,
+                previewsContainer: ".dropzone-previews",
+                paramName: "file",
+                headers: {
+                    'X-CSRF-TOKEN': csrf_token
+                },
+                init: function () {
+                    var myDropzone = this;
+                    
+                    this.on("addedfile", function (file) {
+                    console.log("File added to queue:", file);
+                    });
+
+                    document.getElementById("uploadButton").addEventListener("click", function () {
+                    if (myDropzone.getQueuedFiles().length === 0) {
+                        alert("Please select a file before uploading!");
+                        return;
+                    }
+                    var description = document.querySelector("#description").value.trim();
+                    if (!description) {
+                        alert("Please enter a description before uploading!");
+                        return;
+                    }
+                    
+                    myDropzone.on("sending", function (file, xhr, formData) {
+                        formData.append("description", description);
+                        formData.append("csrf_token", csrf_token);
+                    });
+                    
+                    myDropzone.processQueue();
+                    });
+                }
+                }
+    </script>
 {% endblock %}
